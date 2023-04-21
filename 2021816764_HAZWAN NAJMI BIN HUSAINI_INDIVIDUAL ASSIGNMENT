@@ -1,0 +1,71 @@
+#include <sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#define NUM_CHILD 5
+#define BUFF_SIZE 512
+
+    void sigint_handler(int sig) {
+    printf ("\nThere is an interrupt detected. Program will now exiting.\n");
+    exit (EXIT_SUCCESS);
+    } 
+
+    int main () 
+    {
+
+    int i, pipefd[2]; 
+    pid_t pid;
+    char buff [BUFF_SIZE]; 
+
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+        perror ("signal");
+        exit (EXIT_FAILURE);
+        } 
+
+    if (pipe(pipefd) == -1) {
+        perror ("pipe");
+        exit (EXIT_FAILURE);
+        }
+
+    for (i = 0; i < NUM_CHILD; i++) {
+        pid = fork();
+        if (pid == -1) {
+            perror ("fork");
+            exit (EXIT_FAILURE);
+        }
+        else if (pid == 0) { 
+            close (pipefd[1]);
+      
+        if (read(pipefd[0], buff, BUFF_SIZE) == -1) {
+             perror ("read");
+             exit (EXIT_FAILURE);
+           }
+     printf ("Child %d received message: %s\n", i+1, buff);
+     close (pipefd[0]); 
+     exit (EXIT_SUCCESS);
+       }
+    }
+    close (pipefd[0]); 
+
+    printf ("Please enter message to send to child processes:\n");
+    fgets (buff, BUFF_SIZE, stdin);
+
+    for (i = 0; i < NUM_CHILD; i++) {
+              if (write(pipefd[1], buff, BUFF_SIZE) == -1) {
+                  perror ("write");
+                  exit (EXIT_FAILURE);
+                  }
+    }
+    close(pipefd[1]); 
+
+    for (i = 0; i < NUM_CHILD; i++) {
+              if (wait(NULL) == -1) {
+                  perror("wait");
+                  exit(EXIT_FAILURE);
+                  }
+    }
+    printf("Process is done\n");
+
+    return 0;
+}
